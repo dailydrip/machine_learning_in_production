@@ -4,6 +4,9 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 
+import sys
+from scout_apm.flask import ScoutApm # 
+
 
 # This is just the function we created in day 3 of this tutorial
 def data_to_dummies(feature_dict, column_names):
@@ -30,15 +33,16 @@ def ctr_prediction(feature_dict, column_names, model):
 def read_dataset(number_of_samples):
     import os # temp
     cwd = os.getcwd()
-    if cwd.find('app') >= 0:
-        app_path = cwd + '/app/'
+    print(cwd)
+    if cwd.find('app') < 0:
+        app_path = cwd + '/app'
     else:
-        app_path = 'app/'
+        app_path = cwd
 
     if number_of_samples == 'all':
-        data = pd.read_csv(app_path + 'data/train')
+        data = pd.read_csv(app_path + '/data/train.gz', compression='gzip')
     else:
-        data = pd.read_csv(app_path + 'data/train', nrows=int(number_of_samples))
+        data = pd.read_csv(app_path + '/data/train.gz', compression='gzip', nrows=int(number_of_samples))
     return data
 
 
@@ -73,8 +77,20 @@ def class_balance(data, downsampling):
 
     return data
 
-# Flask functions
+#########################
+#### Flask functions ####
+#########################
+
+# Creating app
 app = Flask(__name__)
+
+# Attaches ScoutApm to the Flask App
+ScoutApm(app)
+
+# Scout settings
+app.config['SCOUT_MONITOR'] = True
+app.config['SCOUT_KEY']     = "tKRHepzLMuqp0T5lhiuR"
+app.config['SCOUT_NAME']    = "CTR Predictor"
 
 
 @app.route('/')
@@ -89,7 +105,7 @@ def train():
     number_of_samples = request.form['number_of_samples']
     balancing         = request.form['balancing']
 
-    data = read_dataset(int(number_of_samples))
+    data = read_dataset(number_of_samples)
 
     if balancing == 'downsampling':
         data = class_balance(data, downsampling=True)
@@ -163,11 +179,27 @@ def predict():
 
 
 
-@app.route('/get_prob', methods=['GET'])
+@app.route('/get_prob/<string:banner_pos>,<string:app_domain>,<string:device_type>', methods=['GET'])
 def get_probability(banner_pos, app_domain, device_type):
 
+    feature_dict = {
+        'banner_pos'  : banner_pos,
+        'app_domain'  : app_domain,
+        'device_type' : device_type
+    }
+
+
+    # Loading the training information
+    training_info = pickle.load(open('training_info.pkl', 'rb'))
+
+    # Loading the dummy columns
+    dummy_cols = training_info['dummy_columns']
+
+    # Loading the model
+    model = pickle.load(open('CTR_pred_model.pkl', 'rb'))
+
     # This will return the prediction
-    pred = ctr_prediction(request.form, dummy_cols, model)
+    pred = ctr_prediction(feature_dict, dummy_cols, model)
     return jsonify({'prob': pred})
 
 
