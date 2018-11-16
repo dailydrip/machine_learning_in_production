@@ -3,9 +3,8 @@ import pickle
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
+from scout_apm.flask import ScoutApm # Necessary for Scout monitoring
 
-import sys
-from scout_apm.flask import ScoutApm # 
 
 
 # This is just the function we created in day 3 of this tutorial
@@ -20,7 +19,8 @@ def data_to_dummies(feature_dict, column_names):
                 else:
                     values.append(0)
     return values
- 
+
+
 
 def ctr_prediction(feature_dict, column_names, model):
     # This will create the values for the dummy
@@ -28,6 +28,7 @@ def ctr_prediction(feature_dict, column_names, model):
     values = data_to_dummies(feature_dict, column_names)
     prediction_prob = model.predict_proba(np.array([values]))    
     return prediction_prob[0][1]
+
 
 
 def read_dataset(number_of_samples):
@@ -44,6 +45,7 @@ def read_dataset(number_of_samples):
     else:
         data = pd.read_csv(app_path + '/data/train.gz', compression='gzip', nrows=int(number_of_samples))
     return data
+
 
 
 def class_balance(data, downsampling):
@@ -77,6 +79,8 @@ def class_balance(data, downsampling):
 
     return data
 
+
+
 #########################
 #### Flask functions ####
 #########################
@@ -95,7 +99,6 @@ app.config['SCOUT_NAME']    = "CTR Predictor"
 
 @app.route('/')
 def home():
-
     return render_template('home.html')
 
 
@@ -134,11 +137,11 @@ def train():
     np.random.seed(seed)
 
     # Training the model
-    model = LogisticRegression()
-    model.fit(X, y)
+    log_reg = LogisticRegression()
+    log_reg.fit(X, y)
 
     # Saving the model
-    pickle.dump(model, open('CTR_pred_model.pkl', 'wb'))
+    pickle.dump(log_reg, open('CTR_pred_model.pkl', 'wb'))
 
     # Creating dummy variables for prediction
     dummy_cols = X.columns
@@ -161,8 +164,6 @@ def train():
     pickle.dump(training_info, open('training_info.pkl', 'wb'))
 
     return predict()
-
-    # return render_template('predict.html', dummy_cols_dic=dummy_cols_dic, n_samples=X.shape[0], n_features=X.shape[1])
 
 
 
@@ -188,7 +189,6 @@ def get_probability(banner_pos, app_domain, device_type):
         'device_type' : device_type
     }
 
-
     # Loading the training information
     training_info = pickle.load(open('training_info.pkl', 'rb'))
 
@@ -196,10 +196,10 @@ def get_probability(banner_pos, app_domain, device_type):
     dummy_cols = training_info['dummy_columns']
 
     # Loading the model
-    model = pickle.load(open('CTR_pred_model.pkl', 'rb'))
+    log_reg = pickle.load(open('CTR_pred_model.pkl', 'rb'))
 
     # This will return the prediction
-    pred = ctr_prediction(feature_dict, dummy_cols, model)
+    pred = ctr_prediction(feature_dict, dummy_cols, log_reg)
     return jsonify({'prob': pred})
 
 
@@ -214,19 +214,16 @@ def results():
     dummy_cols = training_info['dummy_columns']
 
     # Loading the model
-    model = pickle.load(open('CTR_pred_model.pkl', 'rb'))
-
-    # json_prob = get_probability()
+    log_reg = pickle.load(open('CTR_pred_model.pkl', 'rb'))
 
     # This will return the prediction
-    pred = ctr_prediction(request.form, dummy_cols, model)
+    pred = ctr_prediction(request.form, dummy_cols, log_reg)
 
     # Returning a function to render the HTML and sending
     # the variable prediction calculated by "ctr_prediction
     return render_template('results.html', prediction=pred)
 
 
- 
 
 if __name__ == '__main__':
   app.run(debug=True)
