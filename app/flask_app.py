@@ -93,7 +93,7 @@ ScoutApm(app)
 
 # Scout settings
 app.config['SCOUT_MONITOR'] = True
-app.config['SCOUT_KEY']     = "tKRHepzLMuqp0T5lhiuR"
+app.config['SCOUT_KEY']     = "... your key goes here ..."
 app.config['SCOUT_NAME']    = "CTR Predictor"
 
 
